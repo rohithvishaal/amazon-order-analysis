@@ -1,0 +1,59 @@
+# ==========================================
+# Python & Environment
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+wheels/
+*.egg-info/
+.venv/
+venv/
+ENV/
+env/
+
+# ==========================================
+# Personal Amazon Order Data (Privacy Protection)
+# ==========================================
+# Never commit personal purchase histories, PDFs, or invoices!
+Your Orders/
+Your Orders.zip
+amazon-orders-*.json
+amazon_orders_master.json
+dashboard.html
+*.pdf
+*.zip
+
+# Ignore loose order CSVs in root (except sample_data and FileDescriptions.csv)
+*.csv
+!FileDescriptions.csv
+!sample_data/**/*.csv
+
+# ==========================================
+# Node & Web Build Artifacts
+# ==========================================
+node_modules/
+package-lock.json
+
+# ==========================================
+# OS & IDE Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# Logs & Cache
+# ==========================================
+*.log
+.pytest_cache/
