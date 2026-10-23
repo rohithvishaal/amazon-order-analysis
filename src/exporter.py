@@ -303,8 +303,8 @@ class DashboardExporter:
         <span class="badge b-yellow">Executive Edition</span>
       </div>
       <p class="text-xs text-[var(--muted-foreground)] mt-1">
-        Comprehensive portfolio breakdown &bull; <strong id="hdrTotalOrders" class="text-[var(--foreground)]">341</strong> orders &bull; 
-        <strong id="hdrDateSpan" class="text-[var(--foreground)]">2018 - 2026</strong> &bull; 
+        Comprehensive portfolio breakdown &bull; <strong id="hdrTotalOrders" class="text-[var(--foreground)]">--</strong> orders &bull; 
+        <strong id="hdrDateSpan" class="text-[var(--foreground)]">--</strong> &bull; 
         Harmonized across Order History, Digital Orders, Returns, and Refunds
       </p>
     </div>
@@ -329,7 +329,7 @@ class DashboardExporter:
         <input id="fSearch" type="text" placeholder="&#x1F50D; Search title, order ID, ASIN, tracking..." class="inp w-full" oninput="onGlobalFilterChange()">
       </div>
       <select id="fYear" class="inp" onchange="onGlobalFilterChange()">
-        <option value="">All Years (2018-2026)</option>
+        <option id="optAllYears" value="">All Years</option>
       </select>
       <select id="fCategory" class="inp" onchange="onGlobalFilterChange()">
         <option value="">All Categories</option>
@@ -353,7 +353,7 @@ class DashboardExporter:
         <option value="">All Locations</option>
       </select>
       <div class="text-xs text-[var(--muted-foreground)] font-medium pl-2">
-        Showing <strong id="lblFilteredCount" class="text-[var(--foreground)]">341</strong> orders (<span id="lblFilteredSpend">₹0</span>)
+        Showing <strong id="lblFilteredCount" class="text-[var(--foreground)]">--</strong> orders (<span id="lblFilteredSpend">₹0</span>)
       </div>
     </div>
   </section>
@@ -414,7 +414,7 @@ class DashboardExporter:
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
       <div class="chart-card">
         <div class="flex items-center justify-between">
-          <p class="sec-title">&#x1F4C5; Annual Spending Waterfall (2018 - 2026)</p>
+          <p id="titleAnnualWaterfall" class="sec-title">&#x1F4C5; Annual Spending Trajectory</p>
           <span class="clickable-chart-hint">&#x2728; Click bar to filter orders</span>
         </div>
         <p class="sec-sub">Gross vs Net spend trajectory and annual order volume</p>
@@ -1023,9 +1023,16 @@ class DashboardExporter:
       const elTotal = document.getElementById('hdrTotalOrders');
       if (elTotal) elTotal.textContent = MASTER_ORDERS.length;
       const elSpan = document.getElementById('hdrDateSpan');
-      if (elSpan) {{
-        const yrs = [...new Set(MASTER_ORDERS.map(o => o.orderDate ? o.orderDate.slice(0, 4) : '').filter(Boolean))].sort();
-        if (yrs.length) elSpan.textContent = yrs.length === 1 ? yrs[0] : `${{yrs[0]}} - ${{yrs[yrs.length - 1]}}`;
+      const optAllYears = document.getElementById('optAllYears');
+      const titleWaterfall = document.getElementById('titleAnnualWaterfall');
+      const yrs = [...new Set(MASTER_ORDERS.map(o => o.orderDate ? o.orderDate.slice(0, 4) : '').filter(Boolean))].sort();
+      if (yrs.length) {{
+        const spanText = yrs.length === 1 ? yrs[0] : `${{yrs[0]}} - ${{yrs[yrs.length - 1]}}`;
+        if (elSpan) elSpan.textContent = spanText;
+        if (optAllYears) optAllYears.textContent = `All Years (${{spanText}})`;
+        if (titleWaterfall) titleWaterfall.innerHTML = `&#x1F4C5; Annual Spending Trajectory (${{spanText}})`;
+      }} else {{
+        if (elSpan) elSpan.textContent = 'No Dates';
       }}
       populateDropdowns();
       applyFilters();
