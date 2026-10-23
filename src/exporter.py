@@ -19,7 +19,9 @@ class DashboardExporter:
     def __init__(self, orders: List[Order], analytics: Dict[str, Any]):
         self.orders = orders
         self.analytics = analytics
-        self.chart_js_path = WORKSPACE_DIR / "node_modules" / "chart.js" / "dist" / "chart.umd.min.js"
+        self.chart_js_path = (
+            WORKSPACE_DIR / "node_modules" / "chart.js" / "dist" / "chart.umd.min.js"
+        )
 
     def export_json(self, output_path: Optional_Path = None) -> Path:
         """Export full serialized orders and analytics payload to JSON."""
@@ -29,7 +31,9 @@ class DashboardExporter:
                 "generatedAt": datetime.now().isoformat(),
                 "totalOrders": len(self.orders),
                 "dateRange": {
-                    "start": self.analytics.get("summary", {}).get("dateRangeStart", ""),
+                    "start": self.analytics.get("summary", {}).get(
+                        "dateRangeStart", ""
+                    ),
                     "end": self.analytics.get("summary", {}).get("dateRangeEnd", ""),
                 },
             },
@@ -56,8 +60,10 @@ class DashboardExporter:
         orders_dict = [o.to_dict() for o in self.orders]
         orders_json = json.dumps(orders_dict, separators=(",", ":"), ensure_ascii=True)
         orders_json = orders_json.replace("&", "\\u0026").replace("</", "<\\/")
-        
-        analytics_json = json.dumps(self.analytics, separators=(",", ":"), ensure_ascii=True)
+
+        analytics_json = json.dumps(
+            self.analytics, separators=(",", ":"), ensure_ascii=True
+        )
         analytics_json = analytics_json.replace("&", "\\u0026").replace("</", "<\\/")
 
         chart_js_content = ""
@@ -68,12 +74,16 @@ class DashboardExporter:
             except Exception as e:
                 logger.warning(f"Could not read local Chart.js: {e}")
 
-        html_content = self._render_template(orders_json, analytics_json, chart_js_content)
+        html_content = self._render_template(
+            orders_json, analytics_json, chart_js_content
+        )
         with open(target, "w", encoding="utf-8") as f:
             f.write(html_content)
         return target
 
-    def _render_template(self, orders_json: str, analytics_json: str, chart_js_content: str) -> str:
+    def _render_template(
+        self, orders_json: str, analytics_json: str, chart_js_content: str
+    ) -> str:
         """Render complete HTML template with embedded payload, Chart.js runtime, and client UI."""
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -920,6 +930,19 @@ class DashboardExporter:
       if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'K';
       return '₹' + n;
     }};
+    const formatYearMonth = ym => {{
+      if (!ym) return '';
+      const parts = String(ym).split('-');
+      if (parts.length === 2) {{
+        const yr = parseInt(parts[0], 10);
+        const mo = parseInt(parts[1], 10);
+        if (!isNaN(yr) && !isNaN(mo) && mo >= 1 && mo <= 12) {{
+          const dt = new Date(yr, mo - 1, 1);
+          return dt.toLocaleDateString('en-US', {{ month: 'long', year: 'numeric' }});
+        }}
+      }}
+      return String(ym);
+    }};
 
     // Theme color helper
     const isLight = () => document.documentElement.classList.contains('light');
@@ -1294,8 +1317,25 @@ class DashboardExporter:
       if (params.type !== undefined) {{
         document.getElementById('fType').value = params.type;
       }}
+      if (params.city !== undefined) {{
+        document.getElementById('fCity').value = params.city;
+        colFilters.city = params.city;
+        const ordCity = document.getElementById('ordColCity');
+        if (ordCity) ordCity.value = params.city;
+      }}
+      if (params.ordId !== undefined) {{
+        colFilters.orderId = params.ordId.toLowerCase();
+        const ordIdInput = document.getElementById('ordColOrderId');
+        if (ordIdInput) ordIdInput.value = params.ordId;
+      }}
       if (params.weekday !== undefined) {{
-        colFilters.weekday = params.weekday;
+        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        if (typeof params.weekday === 'string') {{
+          const di = dayNames.indexOf(params.weekday);
+          colFilters.weekday = di !== -1 ? di : null;
+        }} else {{
+          colFilters.weekday = params.weekday;
+        }}
       }}
       if (params.priceTier !== undefined) {{
         colFilters.priceTier = params.priceTier;
@@ -2438,16 +2478,17 @@ class DashboardExporter:
     // TAB 8: DYNAMIC STRATEGIC ANALYST INSIGHTS
     function renderInsightsTab() {{
       const topCat = (MASTER_ANALYTICS.categories && MASTER_ANALYTICS.categories[0]) || null;
-      const topSplurge = (MASTER_ANALYTICS.top_splurges && MASTER_ANALYTICS.top_splurges[0]) || null;
+      const topSplurges = MASTER_ANALYTICS.top_splurges || MASTER_ANALYTICS.topSplurges || [];
+      const topSplurge = (topSplurges && topSplurges[0]) || null;
       const utilityOrders = MASTER_ORDERS.filter(o => o.orderType === 'Utility & Recharge');
       const utilSpend = utilityOrders.reduce((s, o) => s + o.totalAmount, 0);
       const logistics = MASTER_ANALYTICS.logistics || {{}};
       const primaryCarrier = logistics.primaryCarrier || 'Standard Carrier';
-      const totalPhysical = logistics.totalPhysicalShipments || 1;
+      const totalPhysical = logistics.totalPhysicalShipments || 0;
       const carrierTop = (logistics.carriers && logistics.carriers[0]) || null;
-      const carrierShare = carrierTop ? ((carrierTop.count / totalPhysical) * 100).toFixed(0) : '0';
+      const carrierShare = (carrierTop && totalPhysical > 0) ? ((carrierTop.count / totalPhysical) * 100).toFixed(0) : '0';
 
-      const timePatterns = MASTER_ANALYTICS.time_patterns || {{}};
+      const timePatterns = MASTER_ANALYTICS.time_patterns || MASTER_ANALYTICS.timePatterns || {{}};
       const maxStreak = timePatterns.longestDayStreak || 1;
       const activeDays = timePatterns.activeShoppingDays || 0;
       const peakDay = timePatterns.peakDay || 'Sunday';
@@ -2461,36 +2502,67 @@ class DashboardExporter:
       const refundRecovered = returns.totalRefundAmount || 0;
       const replacementCount = (returns.replacementLinks || []).length;
 
-      const monthly = MASTER_ANALYTICS.monthly || [];
-      const peakMonth = monthly.length ? [...monthly].sort((a, b) => b.totalSpend - a.totalSpend)[0] : null;
+      let monthly = MASTER_ANALYTICS.monthly || [];
+      if (!monthly.length && MASTER_ORDERS.length) {{
+        const mSpend = {{}};
+        const mCount = {{}};
+        MASTER_ORDERS.forEach(o => {{
+          if (!o.orderDate) return;
+          const ym = o.orderDate.slice(0, 7);
+          mSpend[ym] = (mSpend[ym] || 0) + o.totalAmount;
+          mCount[ym] = (mCount[ym] || 0) + 1;
+        }});
+        monthly = Object.keys(mSpend).map(ym => ({{
+          yearMonth: ym,
+          month: ym,
+          spend: mSpend[ym],
+          totalSpend: mSpend[ym],
+          orderCount: mCount[ym]
+        }}));
+      }}
+
+      const getSpend = m => (m ? (m.spend !== undefined ? m.spend : (m.totalSpend !== undefined ? m.totalSpend : 0)) : 0);
+      const getMonthStr = m => (m ? (m.yearMonth || m.month || '') : '');
+      const getOrderCount = m => (m ? (m.orderCount !== undefined ? m.orderCount : (m.ordersCount !== undefined ? m.ordersCount : (m.orders || 0))) : 0);
+
+      const peakMonth = monthly.length ? [...monthly].sort((a, b) => getSpend(b) - getSpend(a))[0] : null;
+      const peakSpend = peakMonth ? getSpend(peakMonth) : 0;
+      const peakMonthStr = peakMonth ? getMonthStr(peakMonth) : '';
+      const peakMonthLabel = formatYearMonth(peakMonthStr) || peakMonthStr || 'Unknown Month';
+      const peakOrderCount = peakMonth ? getOrderCount(peakMonth) : 0;
 
       const topCatOrders = topCat ? MASTER_ORDERS.filter(o => o.category === topCat.category) : [];
       const sampleItems = [...new Set(topCatOrders.map(o => (o.items && o.items[0] && o.items[0].title) ? o.items[0].title.slice(0, 45) : '').filter(Boolean))].slice(0, 3);
 
       const divBehavior = document.getElementById('lstBehavioralInsights');
       if (divBehavior) {{
+        const topCatName = topCat ? topCat.category : 'General Retail';
+        const splurgeTitle = topSplurge ? (topSplurge.title ? (topSplurge.title.length > 65 ? topSplurge.title.slice(0, 65) + '...' : topSplurge.title) : 'High-Value Order') : '';
+
         divBehavior.innerHTML = `
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
-            <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4CA; Dominant Category: ${{topCat ? topCat.category : 'General Retail'}}</strong>
+            <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4CA; Dominant Category: ${{topCatName}}</strong>
             ${{topCat ? `
-              <strong>${{topCat.category}}</strong> is the #1 expenditure category, capturing <span class="text-[var(--foreground)] font-semibold">${{fmt(topCat.spend)}} (${{topCat.spendSharePct}}%)</span> across ${{topCat.orderCount}} orders.${{sampleItems.length ? ` Key purchases include: ${{sampleItems.join(', ')}}...` : ''}}
+              <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ category: this.dataset.cat }}, 'Filtered orders for Category: ' + this.dataset.cat)" data-cat="${{topCat.category}}" title="Click to filter orders for ${{topCat.category}}">${{topCat.category}}</strong> is the #1 expenditure category, capturing <span class="text-[var(--foreground)] font-semibold">${{fmt(topCat.spend)}} (${{topCat.spendSharePct}}%)</span> across ${{topCat.orderCount}} orders.${{sampleItems.length ? ` Key purchases include: ${{sampleItems.join(', ')}}...` : ''}}
             ` : 'No category data recorded.'}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F3C5; Highest-Value Single Investment</strong>
             ${{topSplurge ? `
-              Largest single order was <strong class="text-[var(--foreground)]">${{topSplurge.title.slice(0, 65)}}...</strong> purchased for <span class="text-[var(--primary)] font-bold">${{fmt(topSplurge.amount)}}</span> on ${{topSplurge.date}} (${{topSplurge.category}}).
+              Largest single order was <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ ordId: this.dataset.ord }}, 'Order: ' + this.dataset.ord)" data-ord="${{topSplurge.orderId}}" title="Click to filter order ${{topSplurge.orderId}}">${{splurgeTitle}}</strong> purchased for <span class="text-[var(--primary)] font-bold">${{fmt(topSplurge.amount)}}</span> on ${{topSplurge.date}} (${{topSplurge.category}}).
             ` : 'No purchase records available.'}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4B3; Amazon Pay & Utility Ecosystem</strong>
             ${{utilityOrders.length > 0 ? `
-              <strong>${{utilityOrders.length}} utility transactions</strong> totaling <span class="text-[var(--foreground)] font-semibold">${{fmt(utilSpend)}}</span> were processed through Amazon for electricity, mobile recharges, or bill payments.
+              <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ type: 'Utility & Recharge' }}, 'Filtered for Utility & Recharge orders')" title="Click to filter Utility & Recharge orders">${{utilityOrders.length}} utility transactions</strong> totaling <span class="text-[var(--foreground)] font-semibold">${{fmt(utilSpend)}}</span> were processed through Amazon for electricity, mobile recharges, or bill payments.
             ` : 'No utility orders recorded in this portfolio.'}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F69A; Primary Courier Network</strong>
-            <strong>${{primaryCarrier}}</strong> is your leading courier partner, handling <span class="text-[var(--foreground)] font-semibold">${{carrierShare}}%</span> of physical retail shipments (${{carrierTop ? carrierTop.count : 0}} shipments).
+            ${{carrierTop && totalPhysical > 0 ? `
+              <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ carrier: this.dataset.car }}, 'Filtered orders for Carrier: ' + this.dataset.car)" data-car="${{primaryCarrier}}" title="Click to filter carrier orders">${{primaryCarrier}}</strong> is your leading courier partner, handling <span class="text-[var(--foreground)] font-semibold">${{carrierShare}}%</span> of physical retail shipments (${{carrierTop.count}} shipments).
+            ` : 'No physical retail shipments recorded.'}}
           </div>
         `;
       }}
@@ -2500,23 +2572,29 @@ class DashboardExporter:
         divSeason.innerHTML = `
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4C6; Purchasing Streaks & Rhythms</strong>
-            Your longest consecutive-day shopping streak was <strong class="text-[var(--foreground)]">${{maxStreak}} day(s)</strong>, while orders were placed across <strong class="text-[var(--foreground)]">${{activeDays}} unique days</strong>. Peak ordering occurred on <strong class="text-[var(--foreground)]">${{peakDay}}s</strong> around <strong class="text-[var(--foreground)]">${{peakHour}} IST</strong>.
+            ${{activeDays > 0 ? `
+              Your longest consecutive-day shopping streak was <strong class="text-[var(--foreground)]">${{maxStreak}} day(s)</strong>, while orders were placed across <strong class="text-[var(--foreground)]">${{activeDays}} unique days</strong>. Peak ordering occurred on <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ weekday: this.dataset.day }}, 'Filtered orders for Weekday: ' + this.dataset.day)" data-day="${{peakDay}}" title="Click to filter by weekday">${{peakDay}}s</strong> around <strong class="text-[var(--foreground)]">${{peakHour}} IST</strong>.
+            ` : 'No chronological ordering rhythm data recorded.'}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F6D2; Highest Spending Velocity</strong>
-            ${{peakMonth ? `
-              Highest single-month spend surged in <strong class="text-[var(--foreground)]">${{peakMonth.month}}</strong> with <span class="text-[var(--primary)] font-bold">${{fmt(peakMonth.totalSpend)}}</span> recorded across ${{peakMonth.orderCount}} orders.
-            ` : 'No longitudinal monthly trends available.'}}
+            ${{peakMonth && peakSpend > 0 ? `
+              Highest single-month spend surged in <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ dateMonth: this.dataset.month }}, 'Filtered orders for Month: ' + this.dataset.label)" data-month="${{peakMonthStr}}" data-label="${{peakMonthLabel}}" title="Click to filter orders for ${{peakMonthLabel}}">${{peakMonthLabel}}</strong> with <span class="text-[var(--primary)] font-bold">${{fmt(peakSpend)}}</span> recorded across ${{peakOrderCount}} orders.
+            ` : (peakMonth && peakOrderCount > 0 ? `
+              Highest single-month activity occurred in <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ dateMonth: this.dataset.month }}, 'Filtered orders for Month: ' + this.dataset.label)" data-month="${{peakMonthStr}}" data-label="${{peakMonthLabel}}" title="Click to filter orders for ${{peakMonthLabel}}">${{peakMonthLabel}}</strong> with <span class="text-[var(--primary)] font-bold">${{peakOrderCount}} orders</span> recorded.
+            ` : 'No longitudinal monthly trends available.')}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4CD; Geographic Delivery Profile</strong>
             ${{topCities.length > 0 ? `
-              Deliveries spanned <strong>${{geo.length}} unique location(s)</strong>. Primary destination was <strong class="text-[var(--foreground)]">${{topCities[0].city}}</strong> (${{topCities[0].orderCount}} orders, ${{fmt(topCities[0].spend)}}), active from ${{topCities[0].firstOrder}} to ${{topCities[0].lastOrder}}${{topCities.length > 1 ? `, followed by ${{topCities[1].city}} (${{topCities[1].orderCount}} orders)` : ''}}.
+              Deliveries spanned <strong>${{geo.length}} unique location(s)</strong>. Primary destination was <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ city: this.dataset.city }}, 'Filtered orders for City: ' + this.dataset.city)" data-city="${{topCities[0].city}}" title="Click to filter orders for ${{topCities[0].city}}">${{topCities[0].city}}</strong> (${{topCities[0].orderCount}} orders, ${{fmt(topCities[0].spend)}})${{topCities[0].firstOrder && topCities[0].lastOrder ? `, active from ${{topCities[0].firstOrder}} to ${{topCities[0].lastOrder}}` : ''}}${{topCities.length > 1 ? `, followed by <span class="cursor-pointer hover:underline" onclick="filterAndJumpToOrders({{ city: this.dataset.city }}, 'Filtered orders for City: ' + this.dataset.city)" data-city="${{topCities[1].city}}">${{topCities[1].city}}</span> (${{topCities[1].orderCount}} orders)` : ''}}.
             ` : 'No geographic delivery records available.'}}
           </div>
           <div class="p-3 rounded-lg bg-[var(--accent)] border border-[var(--border)]">
             <strong class="text-[var(--foreground)] block text-sm mb-1">&#x1F4B0; Returns & Recovery Efficiency</strong>
-            Across ${{totalReturns}} initiated returns, you recovered <span class="text-[var(--foreground)] font-semibold">${{fmt(refundRecovered)}}</span> in cash refunds, with ${{replacementCount}} defective item(s) resolved via direct replacement shipments.
+            ${{totalReturns > 0 ? `
+              Across <strong class="text-[var(--foreground)] cursor-pointer hover:underline" onclick="switchTab('returns')" title="Click to view Returns & Exchanges">${{totalReturns}} initiated returns</strong>, you recovered <span class="text-[var(--foreground)] font-semibold">${{fmt(refundRecovered)}}</span> in cash refunds, with ${{replacementCount}} defective item(s) resolved via direct replacement shipments.
+            ` : 'No return requests or defective item claims recorded in this portfolio (100% order retention).'}}
           </div>
         `;
       }}
