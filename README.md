@@ -86,7 +86,7 @@ If you prefer running commands manually in your terminal:
 uv venv .venv
 source .venv/bin/activate    # On Windows: .venv\Scripts\activate
 uv pip install "duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil"
-
+python -m src.chartjs
 # 2. Generate dashboard and start local web server:
 python main.py --serve
 
