@@ -29,8 +29,8 @@ if [ -z "$PYTHON_SYS" ]; then
 fi
 echo "  OK: $($PYTHON_SYS --version)"
 
-# 2. uv (fast package manager) + virtual environment
-echo "[2/4] Setting up environment with uv..."
+# 2. uv (fast package manager) + virtual environment + dependencies
+echo "[2/4] Setting up environment and dependencies with uv..."
 PYTHON_BIN=".venv/bin/python"
 
 find_uv() {
@@ -58,8 +58,8 @@ echo "  OK: $("${UV_CMD[@]}" --version)"
 
 # Recreate a broken venv
 if [ -d ".venv" ] && [ ! -x "$PYTHON_BIN" ]; then rm -rf .venv; fi
-[ -x "$PYTHON_BIN" ] || "${UV_CMD[@]}" venv .venv
-echo "  OK: zero-dependency environment ready"
+"${UV_CMD[@]}" sync
+echo "  OK: dependencies installed"
 
 # 3. Chart.js (needed for the graphs) - downloaded directly if not present
 echo "[3/4] Checking Chart.js..."

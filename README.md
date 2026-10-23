@@ -1,6 +1,6 @@
 # 📦 Amazon Order Analytics & Intelligence Dashboard
 
-A modern, offline analytical suite to visualize and explore your complete Amazon purchase history in a rich, interactive dashboard. **100% private & local — runs entirely on Python's built-in standard library with zero external pip dependencies. Your personal data never leaves your computer.**
+A modern, offline analytical suite to visualize and explore your complete Amazon purchase history in a rich, interactive dashboard. **100% private & local — runs on Python's standard library with tzdata for cross-platform timezone accuracy. Your personal data never leaves your computer.**
 
 ---
 
@@ -25,20 +25,20 @@ The launcher will automatically start a local server and open your default brows
 
 ---
 
-## ⚙️ Prerequisites & Zero-Dependency Architecture
+## ⚙️ Prerequisites & Architecture
 
 ### System Requirements
 | Requirement | Supported Version | Purpose | How to Install |
 | :--- | :--- | :--- | :--- |
 | **Python** | **3.10 or newer** *(Python 3.10 – 3.14)* | Runtime engine | [Download from python.org](https://www.python.org/downloads/) *(On Windows, tick "Add Python to PATH")* |
-| **Dependencies** | **None (0 external packages)** | Complete data ingestion & analytics | Runs 100% on Python's standard library (`csv`, `collections`, `datetime`, `json`) |
-| **Astral `uv`** *(Optional)* | Any version | Instant virtual environment isolation | **Handled automatically by the run scripts!** |
+| **Dependencies** | **tzdata** | IANA timezone database for cross-platform accuracy | Installed automatically via `uv sync` |
+| **Astral `uv`** *(Optional)* | Any version | Instant virtual environment and dependency sync | **Handled automatically by the run scripts!** |
 | **Web Browser** | Any modern browser | Renders the interactive dashboard UI | Chrome, Brave, Edge, Firefox, or Safari |
 
 ### Automated Bootstrap Workflow
 When you double-click any launcher (`Run_Dashboard.command`, `run.bat`, or `run.sh`), the script automatically:
 1. **Checks for Python 3.10+**: Verifies your system has a compatible Python version installed. If missing, it provides direct download instructions.
-2. **Initializes Virtual Environment**: Automatically runs `uv venv .venv` (or fallback) for clean isolation.
+2. **Initializes Virtual Environment & Syncs Dependencies**: Automatically runs `uv sync` to set up `.venv` and install `tzdata` (required for IANA time zones on Windows).
 3. **Validates Offline Assets**: Ensures local `Chart.js` is cached for standalone offline graphing without CDN reliance.
 4. **Processes Orders & Launches Server**: Parses and harmonizes all order files, generates `dashboard.html` and `amazon_orders_master.json`, and launches the interactive dashboard.
 
@@ -82,8 +82,8 @@ To visualize your own real Amazon order history, follow these 3 simple steps:
 If you prefer running commands manually in your terminal:
 
 ```bash
-# 1. Initialize virtual environment using uv:
-uv venv .venv
+# 1. Initialize virtual environment and install dependencies using uv:
+uv sync
 source .venv/bin/activate    # On Windows: .venv\Scripts\activate
 
 # 2. Ensure Chart.js is cached locally for offline use (one time):
@@ -109,7 +109,7 @@ python -m unittest discover tests
 
 ## ✨ Features & Capabilities
 
-* **Zero External Dependencies**: Pure Python standard-library implementation. No bulky dependencies, no version conflicts, instant startup.
+* **Minimal Dependencies**: Lightweight implementation requiring only `tzdata` for cross-platform IANA timezone support on Windows and Unix alike.
 * **Unified Order Harmonization**: Seamlessly unifies physical shipments, prepaid mobile recharges, electricity & utility payments, Prime subscriptions, and digital media into a single relational dataset.
 * **Realized vs. Gross Spend**: Accurately accounts for order cancellations, returns, replacements, and cash refunds so your financial metrics reflect actual net expenditure.
 * **Interactive Click-to-Filter Navigation**: Click on any chart element (annual waterfall bar, category slice, carrier, peak month, or utility row) to immediately filter and jump to those exact orders in the Master Ledger.
