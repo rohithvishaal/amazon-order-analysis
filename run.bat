@@ -1,124 +1,102 @@
 @echo off
+setlocal EnableExtensions
 REM ==============================================================================
-REM Amazon Order Analysis & Intelligence Dashboard - Windows One-Click Launcher
-REM Double-click this file in Windows File Explorer to launch the dashboard!
+REM Amazon Order Analysis - Windows One-Click Launcher
+REM NOTE: no parentheses inside echo text within IF blocks - they break cmd.exe.
 REM ==============================================================================
 cd /d "%~dp0"
+chcp 65001 >nul 2>nul
 
 echo.
 echo ====================================================================
-echo   📦 Amazon Order Analysis ^& Intelligence Dashboard
+echo  Amazon Order Analysis ^& Intelligence Dashboard
 echo ====================================================================
 echo.
 
-REM 1. Check for Python
-echo [1/4] Checking Python installation...
+REM ---- 1. Find a REAL Python 3.10+ (skips the Microsoft Store stub) ----
+echo [1/5] Checking Python...
+set "PY_SYS="
+py -3 -c "import sys; sys.exit(0 if sys.version_info[:2] >= (3,10) else 1)" >nul 2>nul
+if %ERRORLEVEL% EQU 0 set "PY_SYS=py -3"
+if defined PY_SYS goto :py_ok
+python -c "import sys; sys.exit(0 if sys.version_info[:2] >= (3,10) else 1)" >nul 2>nul
+if %ERRORLEVEL% EQU 0 set "PY_SYS=python"
+if defined PY_SYS goto :py_ok
 
-SET "PY_SYS="
-
-where python >nul 2>nul
-IF %ERRORLEVEL% EQU 0 (
-    SET "PY_SYS=python"
-) ELSE (
-    where py >nul 2>nul
-    IF %ERRORLEVEL% EQU 0 (
-        SET "PY_SYS=py -3"
-    )
-)
-
-IF "%PY_SYS%"=="" (
-    echo.
-    echo ====================================================================
-    echo  ERROR: Python 3 was not found on your system!
-    echo ====================================================================
-    echo  To run this application, please install Python:
-    echo    1. Download Python 3.10+ from https://www.python.org/downloads/
-    echo       (Make sure to check "Add Python to PATH" during installation)
-    echo ====================================================================
-    echo.
-    pause
-    exit /b 1
-)
-
-REM Check Python Version (Requires 3.10+)
-%PY_SYS% -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
-IF %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: Your installed Python version is older than 3.10.
-    echo Please install Python 3.10 or newer from https://www.python.org/downloads/
-    echo.
-    pause
-    exit /b 1
-)
-
-echo   [x] Python 3.10+ verified.
-
-REM 2. Check for uv; install automatically if missing
 echo.
-echo [2/4] Verifying Astral uv package manager...
+echo ERROR: Python 3.10 or newer was not found.
+echo Install it from https://www.python.org/downloads/ and tick "Add Python to PATH".
+echo If Windows opens the Microsoft Store instead, disable the python.exe alias in
+echo Settings - Apps - Advanced app settings - App execution aliases.
+echo.
+pause
+exit /b 1
 
-SET "UV_CMD="
+:py_ok
+echo   OK: using %PY_SYS%
+
+REM ---- 2. uv (fast package manager) + virtual environment + dependencies ----
+echo [2/5] Setting up environment with uv...
+set "UV_CMD="
+call :find_uv
+if defined UV_CMD goto :uv_ok
+
+echo   uv not found - installing it, one time...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex" >nul 2>nul
+set "PATH=%USERPROFILE%\.local\bin;%USERPROFILE%\.cargo\bin;%PATH%"
+call :find_uv
+if defined UV_CMD goto :uv_ok
+
+REM Last resort: pip is used ONLY to bootstrap uv itself
+%PY_SYS% -m pip install --user --upgrade uv
+call :find_uv
+if defined UV_CMD goto :uv_ok
+
+echo ERROR: could not install uv. See https://docs.astral.sh/uv/getting-started/installation/
+goto :fail
+
+:uv_ok
+echo   OK: using %UV_CMD%
+set "PY_BIN=.venv\Scripts\python.exe"
+if exist ".venv" if not exist "%PY_BIN%" rmdir /s /q ".venv"
+if not exist "%PY_BIN%" %UV_CMD% venv .venv
+if errorlevel 1 goto :fail
+%UV_CMD% pip install --python "%PY_BIN%" "duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil"
+if errorlevel 1 goto :fail
+echo   OK: dependencies installed
+goto :after_uv
+
+:find_uv
 where uv >nul 2>nul
-IF %ERRORLEVEL% EQU 0 (
-    SET "UV_CMD=uv"
-) ELSE (
-    %PY_SYS% -m uv --version >nul 2>nul
-    IF %ERRORLEVEL% EQU 0 (
-        SET "UV_CMD=%PY_SYS% -m uv"
-    ) ELSE (
-        echo   Downloading and installing uv via pip...
-        %PY_SYS% -m pip install --upgrade uv
-        where uv >nul 2>nul
-        IF %ERRORLEVEL% EQU 0 (
-            SET "UV_CMD=uv"
-        ) ELSE (
-            %PY_SYS% -m uv --version >nul 2>nul
-            IF %ERRORLEVEL% EQU 0 (
-                SET "UV_CMD=%PY_SYS% -m uv"
-            )
-        )
-    )
+if not errorlevel 1 (
+    set "UV_CMD=uv"
+    exit /b 0
 )
+%PY_SYS% -m uv --version >nul 2>nul
+if not errorlevel 1 set "UV_CMD=%PY_SYS% -m uv"
+exit /b 0
 
-REM 3. Initialize virtual environment and install dependencies
+:after_uv
+
+REM ---- 3. Chart.js (needed for the graphs) - downloaded directly if not present ----
+echo [3/5] Checking Chart.js...
+"%PY_BIN%" -m src.chartjs
+if errorlevel 1 echo   WARN: could not download Chart.js - graphs will not render
+
+REM ---- 4 + 5. Build dashboard and serve ----
+echo [4/5] Processing Amazon orders...
+echo [5/5] Starting dashboard at http://localhost:8000/dashboard.html
+echo Keep this window open while using the dashboard. Press Ctrl+C to stop.
 echo.
-echo [3/4] Initializing environment and dependencies...
+"%PY_BIN%" main.py --serve %*
+if errorlevel 1 goto :fail
+goto :end
 
-SET "PY_BIN="
-
-IF NOT "%UV_CMD%"=="" (
-    echo   [x] Initializing environment with uv...
-    IF NOT EXIST ".venv" (
-        %UV_CMD% venv .venv
-    )
-    echo   [x] Installing / syncing dependencies (duckdb, pandas, python-dateutil)...
-    %UV_CMD% pip install "duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil"
-    SET "PY_BIN=.venv\Scripts\python.exe"
-) ELSE (
-    echo   [!] uv not available, setting up standard venv...
-    IF NOT EXIST ".venv" (
-        %PY_SYS% -m venv .venv
-    )
-    SET "PY_BIN=.venv\Scripts\python.exe"
-    %PY_BIN% -m pip install "duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil"
-)
-
-REM 4. Run Analytics Pipeline and Serve Dashboard
+:fail
 echo.
-echo [4/4] Processing Amazon orders...
-"%PY_BIN%" main.py
-IF %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo ERROR: An error occurred while processing orders.
-    pause
-    exit /b 1
-)
+echo ERROR: Something went wrong - see the messages above.
+pause
+exit /b 1
 
-echo.
-echo Starting local web dashboard server...
-echo Your browser will open automatically at http://localhost:8000/dashboard.html
-echo Keep this window open while using the dashboard. Press Ctrl+C to close.
-echo.
-
-"%PY_BIN%" main.py --serve
+:end
 pause

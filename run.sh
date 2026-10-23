@@ -1,94 +1,73 @@
 #!/bin/bash
 # ==============================================================================
-# Amazon Order Analysis - Cross-Platform Shell Launcher (macOS / Linux)
+# Amazon Order Analysis - Shell Launcher (macOS / Linux)
 # ==============================================================================
 set -e
 cd "$(dirname "$0")"
 
-# Include standard user binary directories in PATH
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 echo ""
 echo "===================================================================="
-echo "  📦 Amazon Order Analysis & Intelligence Dashboard"
+echo " Amazon Order Analysis & Intelligence Dashboard"
 echo "===================================================================="
 echo ""
 
-# 1. Check for Python
-echo "🔍 [1/4] Checking Python installation..."
-
+# 1. Python 3.10+
+echo "[1/5] Checking Python..."
 PYTHON_SYS=""
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON_SYS="python3"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON_SYS="python"
-fi
-
+for cand in python3 python; do
+    if command -v "$cand" >/dev/null 2>&1 && \
+       "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1; then
+        PYTHON_SYS="$cand"
+        break
+    fi
+done
 if [ -z "$PYTHON_SYS" ]; then
-    echo "❌ Error: Python 3 was not found on your system."
-    echo "Please install Python 3.10+ from https://www.python.org/downloads/."
+    echo "ERROR: Python 3.10+ was not found. Install it from https://www.python.org/downloads/"
     exit 1
 fi
+echo "  OK: $($PYTHON_SYS --version)"
 
-PY_VER=$($PYTHON_SYS -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
-PY_COMPAT=$($PYTHON_SYS -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)' 2>/dev/null)
+# 2. uv (fast package manager) + virtual environment + dependencies
+echo "[2/5] Setting up environment with uv..."
+DEPS=("duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil")
+PYTHON_BIN=".venv/bin/python"
 
-if [ "$PY_COMPAT" -ne 1 ]; then
-    echo "❌ Error: Python $PY_VER detected. Python 3.10 or newer is required."
-    exit 1
-fi
-echo "  ✔ Found Python $PY_VER"
+find_uv() {
+    if command -v uv >/dev/null 2>&1; then UV_CMD=(uv); return 0; fi
+    if "$PYTHON_SYS" -m uv --version >/dev/null 2>&1; then UV_CMD=("$PYTHON_SYS" -m uv); return 0; fi
+    return 1
+}
 
-# 2. Check for uv; install automatically if missing
-echo "⚡ [2/4] Verifying uv package manager..."
-UV_CMD=""
-if command -v uv >/dev/null 2>&1; then
-    UV_CMD="uv"
-elif $PYTHON_SYS -m uv --version >/dev/null 2>&1; then
-    UV_CMD="$PYTHON_SYS -m uv"
-else
-    echo "  ⬇ 'uv' not found. Installing Astral uv automatically via pip..."
-    $PYTHON_SYS -m pip install --upgrade uv || {
-        echo "  ⬇ Trying standalone installer..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-    }
-    if command -v uv >/dev/null 2>&1; then
-        UV_CMD="uv"
-    elif $PYTHON_SYS -m uv --version >/dev/null 2>&1; then
-        UV_CMD="$PYTHON_SYS -m uv"
+if ! find_uv; then
+    echo "  uv not found - installing it (one time)..."
+    if command -v curl >/dev/null 2>&1; then
+        curl -LsSf https://astral.sh/uv/install.sh | sh || true
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- https://astral.sh/uv/install.sh | sh || true
+    fi
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+    if ! find_uv; then
+        # Last resort: use pip ONLY to bootstrap uv itself
+        "$PYTHON_SYS" -m pip install --user --upgrade uv \
+            || "$PYTHON_SYS" -m pip install --user --break-system-packages --upgrade uv || true
+        find_uv || { echo "ERROR: could not install uv. See https://docs.astral.sh/uv/getting-started/installation/"; exit 1; }
     fi
 fi
+echo "  OK: $("${UV_CMD[@]}" --version)"
 
-# 3. Initialize virtual environment & install dependencies
-echo "📦 [3/4] Initializing environment and dependencies..."
-PYTHON_BIN=""
+# Recreate a broken venv
+if [ -d ".venv" ] && [ ! -x "$PYTHON_BIN" ]; then rm -rf .venv; fi
+[ -x "$PYTHON_BIN" ] || "${UV_CMD[@]}" venv .venv
+"${UV_CMD[@]}" pip install --python "$PYTHON_BIN" "${DEPS[@]}"
+echo "  OK: dependencies installed"
 
-if [ -n "$UV_CMD" ]; then
-    echo "  ✔ Using uv ($($UV_CMD --version 2>/dev/null | head -n 1))"
-    if [ ! -d ".venv" ]; then
-        echo "  ⚙ Creating .venv virtual environment with uv..."
-        $UV_CMD venv .venv
-    fi
-    echo "  📥 Syncing project dependencies (duckdb, pandas, python-dateutil)..."
-    $UV_CMD pip install "duckdb>=1.0.0" "pandas>=2.0.0" "python-dateutil"
-    PYTHON_BIN=".venv/bin/python"
-else
-    if [ -f ".venv/bin/python" ]; then
-        PYTHON_BIN=".venv/bin/python"
-    else
-        $PYTHON_SYS -m venv .venv
-        PYTHON_BIN=".venv/bin/python"
-    fi
-fi
+# 3. Chart.js (needed for the graphs) - downloaded directly if not present
+echo "[3/5] Checking Chart.js..."
+"$PYTHON_BIN" -m src.chartjs || echo "  WARN: could not download Chart.js - graphs will not render"
 
-echo "  ✔ Python environment ready: $PYTHON_BIN"
-echo ""
-
-# 4. Launch
-echo "📊 [4/4] Running analytics..."
-$PYTHON_BIN main.py
-
-echo ""
-echo "🌐 Starting web dashboard..."
-$PYTHON_BIN main.py --serve "$@"
+# 4 + 5. Build dashboard and serve (main.py --serve builds the dashboard first)
+echo "[4/5] Processing Amazon orders..."
+echo "[5/5] Starting dashboard at http://localhost:8000/dashboard.html (Ctrl+C to stop)"
+exec "$PYTHON_BIN" main.py --serve "$@"
