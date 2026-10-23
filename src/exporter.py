@@ -2355,24 +2355,28 @@ class DashboardExporter:
       `;
 
       // Utility Table
-      document.getElementById('tblUtilityLedger').innerHTML = utilityOrders.slice(0, 30).map(o => `
-        <tr class="cursor-pointer" onclick="filterAndJumpToOrders({{ ordId: '${{o.orderId}}' }}, 'Order: ${{o.orderId}}')">
+      document.getElementById('tblUtilityLedger').innerHTML = utilityOrders.map(o => {{
+        const title = o.primaryTitle || o.title || (o.items && o.items[0] && o.items[0].title) || o.subcategory || 'Utility Transaction';
+        return `
+        <tr class="cursor-pointer hover:bg-[var(--accent)]" onclick="filterAndJumpToOrders({{ ordId: '${{o.orderId}}' }}, 'Order: ${{o.orderId}}')" title="Click to filter order ${{o.orderId}}">
           <td style="padding-left:14px">${{o.orderDate ? o.orderDate.slice(0, 10) : ''}}</td>
           <td class="font-mono text-[11px] text-[var(--primary)]">${{o.orderId}}</td>
-          <td>${{o.primaryTitle}}</td>
+          <td class="font-medium text-[var(--foreground)]">${{title}}</td>
           <td class="font-bold text-right">${{fmt(o.totalAmount)}}</td>
         </tr>
-      `).join('');
+      `;}}).join('');
 
       // Digital Table
-      document.getElementById('tblDigitalLedger').innerHTML = digitalOrders.slice(0, 30).map(o => `
-        <tr class="cursor-pointer" onclick="filterAndJumpToOrders({{ ordId: '${{o.orderId}}' }}, 'Order: ${{o.orderId}}')">
+      document.getElementById('tblDigitalLedger').innerHTML = digitalOrders.map(o => {{
+        const title = o.primaryTitle || o.title || (o.items && o.items[0] && o.items[0].title) || o.subcategory || 'Digital Order';
+        return `
+        <tr class="cursor-pointer hover:bg-[var(--accent)]" onclick="filterAndJumpToOrders({{ ordId: '${{o.orderId}}' }}, 'Order: ${{o.orderId}}')" title="Click to filter order ${{o.orderId}}">
           <td style="padding-left:14px">${{o.orderDate ? o.orderDate.slice(0, 10) : ''}}</td>
-          <td>${{o.primaryTitle}}</td>
+          <td class="font-medium text-[var(--foreground)]">${{title}}</td>
           <td><span class="badge b-purple">${{o.orderType}}</span></td>
           <td class="font-bold text-right">${{fmt(o.totalAmount)}}</td>
         </tr>
-      `).join('');
+      `;}}).join('');
     }}
 
     // TAB 7: MASTER ORDERS TABLE (WITH COLUMN FILTERS & SORTING)

@@ -88,6 +88,8 @@ class Order:
             "shippingAddress": self.shipping_address,
             "city": self.city,
             "detailsUrl": self.details_url,
+            "primaryTitle": self.primary_title,
+            "title": self.primary_title,
             "category": self.primary_category,
             "subcategory": self.primary_subcategory,
             "itemCount": self.item_count,
